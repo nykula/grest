@@ -191,22 +191,53 @@ class Route {
       );
     }
 
+    srv.add_handler(
+      null,
+      async (_, msg) => {
+        const examples = {};
+
+        for (const route of routes) {
+          examples[`GET ${route.path}`] = [new route.model()];
+        }
+
+        msg.set_status(200);
+        msg.set_response(
+          "application/json",
+          MemoryUse.COPY,
+          /** @type {any} */ (JSON.stringify({
+            app: {
+              name: "gjs-status",
+              version: "0.1.0"
+            },
+            examples
+          }))
+        );
+      },
+      /** @type {any} */ (undefined)
+    );
+
     return srv;
   }
 
   constructor() {
     /** @type {any} */
     this.controller = Function;
+
+    /** @type {any} */
+    this.model = Function;
+
     this.path = "";
   }
 }
 
 // Entry.
 
-const app = Route.server([{ path: "/statuses", controller: StatusController }]);
+const app = Route.server([
+  { path: "/statuses", controller: StatusController, model: Status }
+]);
 
 const port = Number(GLib.getenv("PORT"));
-app.listen_all(port, 0);
 print(`Listening on ${port}`);
+app.listen_all(port, 0);
 
 app.run();

@@ -1,5 +1,6 @@
 {
   "name": "gjs-status",
+  "description": "GNOME JavaScript issues and merge requests",
   "version": "0.1.0",
   "main": "index.js",
   "scripts": {
