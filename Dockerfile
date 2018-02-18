@@ -7,7 +7,7 @@ RUN \
   sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list && \
   apt-get update && \
   apt-get -y upgrade && \
-  apt-get install -y curl gir1.2-gtk-3.0 gjs && \
+  apt-get install -y curl gir1.2-gtk-3.0 git gjs && \
   curl -sL https://deb.nodesource.com/setup_9.x | bash - && \
   curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
   echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
