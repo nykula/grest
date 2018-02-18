@@ -8,7 +8,7 @@ Get a [GitLab token](https://docs.gitlab.com/ee/user/profile/personal_access_tok
 
 ```bash
 # Ubuntu 17.10
-sudo apt update && sudo apt install gir1.2-gtk-3.0 git gjs npm
+sudo apt update && sudo apt install gir1.2-glib-2.0 gir1.2-soup-2.4 git gjs npm
 
 git clone https://github.com/makepost/gjs-status
 cd gjs-status
