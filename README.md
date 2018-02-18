@@ -13,7 +13,7 @@ sudo apt update && sudo apt install gir1.2-glib-2.0 gir1.2-soup-2.4 git gjs npm
 git clone https://github.com/makepost/gjs-status
 cd gjs-status
 
-GITLAB_TOKEN=... PORT=3000 yarn start
+GITLAB_TOKEN=... PORT=3000 npm start
 ```
 
 ## Development
