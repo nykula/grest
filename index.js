@@ -148,8 +148,6 @@ class Route {
         async (_, msg, path, query) => {
           const ctx = new Context();
 
-          ctx.body = {};
-          ctx.headers = {};
           ctx.method = msg.method;
           ctx.path = path;
           ctx.query = /** @type {any} */ (query);
@@ -157,6 +155,9 @@ class Route {
           msg.request_headers.foreach((name, value) => {
             ctx.headers[name] = value;
           });
+
+          msg.response_headers.append("Access-Control-Allow-Origin", "*");
+          msg.response_headers.append("Vary", "Origin");
 
           srv.pause_message(msg);
 
