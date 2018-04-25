@@ -1,34 +1,89 @@
-# gjs-status
+# grest.js
 
-Counts issues and merge requests for Gjs, with Gjs.
+REST API microframework for GNOME JavaScript. Talks JSON. Wraps [libsoup](https://wiki.gnome.org/Projects/libsoup), a native HTTP client/server library, with Promise-based plumbing.
+
+## Install
+
+Grest is known to work on Gjs 1.50.2 with [CommonJS runtime](https://github.com/cgjs/cgjs).
+
+```bash
+yarn add grest
+```
 
 ## Usage
 
-Get a [GitLab token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) and run:
+Routing is resourceful, model-centric. Entity classes are plain JS. Controllers extend `Context` which resembles Koa, and have HTTP verbs (e.g. `GET`) as method names.
 
-```bash
-# Ubuntu 17.10
-sudo apt update && sudo apt install gir1.2-glib-2.0 gir1.2-soup-2.4 git gjs npm
+```js
+const { ServerListenOptions } = imports.gi.Soup;
+const { Context, Route } = require("grest");
 
-git clone https://github.com/makepost/gjs-status
-cd gjs-status
+class Greeting {
+  constructor() {
+    this.hello = "world";
+  }
+}
 
-GITLAB_TOKEN=... PORT=3000 npm start
+class GreetingController extends Context {
+  async get() {
+    await Promise.resolve();
+
+    this.body = [new Greeting()];
+  }
+}
+
+const App = Route.server([
+  { path: "/greetings", controller: GreetingController, model: Greeting }
+]);
+
+App.listen_all(3000, ServerListenOptions.IPV6_ONLY);
+
+App.run();
 ```
 
-## Development
+## Index
 
-Also install [Yarn](https://yarnpkg.com/en/docs/install#linux-tab). Get started:
+Your app self-documents at `/`, keying example models by corresponding routes. Reads optional metadata from `package.json` in current working directory. Omits repository link if `private` is true.
 
-```bash
-# install development dependencies
-yarn
-
-# lint all JS files
-yarn format
+```json
+{
+  "app": {
+    "description": "Gjs REST API microframework, talks JSON, wraps libsoup",
+    "name": "grest",
+    "repository": "https://github.com/makepost/grest",
+    "version": "1.0.0"
+  },
+  "examples": {
+    "GET /greetings": [
+      {
+        "hello": "world"
+      }
+    ]
+  }
+}
 ```
 
-[VS Code](https://code.visualstudio.com/) will highlight mistakes and provide autocomplete, as long as you follow JSDoc [@param](http://usejsdoc.org/tags-param.html) and [@type](http://usejsdoc.org/tags-type.html).
+## Fetch
+
+Makes a request with optional headers. Returns another Context.
+
+```js
+const GLib = imports.gi.GLib;
+const { Context } = require("grest");
+
+const base = "https://gitlab.gnome.org/api/v4/projects/GNOME%2Fgjs";
+
+// Returns an array of issues.
+const path = "/issues";
+
+const { body } = await Context.fetch(`${base}${path}`, {
+  headers: {
+    "Private-Token": GLib.getenv("GITLAB_TOKEN")
+  }
+});
+
+print(body.length);
+```
 
 ## License
 

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "esnext",
     "module": "commonjs",
     "allowJs": true,
     "checkJs": true,
@@ -14,6 +14,6 @@
   },
   "include": [
     "node_modules/ts-for-gjs/out/*.d.ts",
-    "index.js"
+    "src"
   ]
 }

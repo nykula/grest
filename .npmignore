@@ -1,0 +1,9 @@
+CONTRIBUTING.md
+Dockerfile
+bin/
+src/app/App.js
+src/app/Status/
+src/domain
+tsconfig.json
+tslint.json
+yarn.lock
