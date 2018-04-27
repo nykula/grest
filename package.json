@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "format": "tsc -p . && tslint -p . --fix",
-    "start": "cgjs bin/start.js"
+    "start": "cgjs bin/start.js",
+    "test": "gunit"
   },
   "repository": "https://github.com/makepost/grest",
   "author": "makepost <makepost@firemail.cc>",
@@ -17,6 +18,7 @@
     "cgjs": "^0.1.32"
   },
   "devDependencies": {
+    "gunit": "^1.0.1",
     "prettier": "^1.10.2",
     "ts-for-gjs": "https://github.com/makepost/ts-for-gjs",
     "tslint": "^5.9.1",

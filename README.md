@@ -4,7 +4,7 @@ REST API microframework for GNOME JavaScript. Talks JSON. Wraps [libsoup](https:
 
 ## Install
 
-Grest is known to work on Gjs 1.50.2 with [CommonJS runtime](https://github.com/cgjs/cgjs).
+Grest is known to work on Gjs 1.52 with [CommonJS runtime](https://github.com/cgjs/cgjs).
 
 ```bash
 yarn add grest
@@ -83,6 +83,32 @@ const { body } = await Context.fetch(`${base}${path}`, {
 });
 
 print(body.length);
+```
+
+## Test
+
+Check yourself with [Gunit](https://github.com/makepost/gunit) to get coverage.
+
+```js
+// src/app/Greeting/GreetingController.test.js
+// Controller and entity are from the examples above.
+
+const { Context, Route } = require("grest");
+const { test } = require("gunit");
+const { Greeting } = require("../domain/Greeting/Greeting");
+const { GreetingController } = require("./GreetingController");
+
+test("gets", async t => {
+  const App = Route.server([
+    { path: "/greetings", controller: GreetingController, model: Greeting }
+  ]);
+
+  const port = 8000 + Math.floor(Math.random() * 10000);
+  App.listen_all(port, 0);
+
+  const { body } = await Context.fetch(`http://localhost:${port}/greetings`);
+  t.is(body[0].hello, "world");
+});
 ```
 
 ## License

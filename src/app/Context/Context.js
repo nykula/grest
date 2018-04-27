@@ -5,9 +5,11 @@ const { Message, Session, URI } = imports.gi.Soup;
 class Context {
   /**
    * @param {string} url
-   * @param {Partial<Context>} ctx
+   * @param {Partial<Context>?} [ctx]
    */
-  static async fetch(url, ctx = {}) {
+  static async fetch(url, ctx) {
+    ctx = ctx || {};
+
     const headers = ctx.headers || {};
     const method = ctx.method || "GET";
 

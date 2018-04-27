@@ -38,8 +38,6 @@ class StatusController extends Context {
       }
     });
 
-    print(JSON.stringify(body));
-
     return body.length;
   }
 }

@@ -26,6 +26,9 @@ yarn
 
 # lint all JS files
 yarn format
+
+# run tests and see coverage
+yarn test && xdg-open coverage/index.html
 ```
 
 [VS Code](https://code.visualstudio.com/) will highlight mistakes and provide autocomplete, as long as you follow JSDoc [@param](http://usejsdoc.org/tags-param.html) and [@type](http://usejsdoc.org/tags-type.html).
