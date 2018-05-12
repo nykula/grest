@@ -1,3 +1,4 @@
+const { fromString } = imports.byteArray;
 const { DataInputStream } = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const { Message, Session, URI } = imports.gi.Soup;
@@ -22,6 +23,10 @@ class Context {
       if (headers[name]) {
         msg.request_headers.append(name, headers[name]);
       }
+    }
+
+    if (ctx.body !== undefined) {
+      msg.request_body.append(fromString(JSON.stringify(ctx.body)));
     }
 
     const session = new Session();

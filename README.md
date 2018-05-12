@@ -41,6 +41,31 @@ App.listen_all(3000, ServerListenOptions.IPV6_ONLY);
 App.run();
 ```
 
+### Receving POST
+
+In constructor, assign a sample body. Usually an array including a model example.
+
+```js
+class GreetingController extends Context {
+  constructor() {
+    super();
+
+    /** @type {Greeting[]} */
+    this.body = [new Greeting()];
+  }
+
+  async post() {
+    const greetings = this.body;
+
+    for (const greeting of greetings) {
+      greeting.hello = "earth";
+    }
+
+    this.body = greetings;
+  }
+}
+```
+
 ## Index
 
 Your app self-documents at `/`, keying example models by corresponding routes. Reads optional metadata from `package.json` in current working directory. Omits repository link if `private` is true.
@@ -83,6 +108,22 @@ const { body } = await Context.fetch(`${base}${path}`, {
 });
 
 print(body.length);
+```
+
+### Sending POST
+
+Grest converts your body to JSON.
+
+```js
+const base = "https://httpbin.org";
+const path = "/post";
+
+const { body } = await Context.fetch(`${base}${path}`, {
+  body: {
+    test: Math.floor(Math.random() * 1000)
+  },
+  method: "POST"
+});
 ```
 
 ## Test

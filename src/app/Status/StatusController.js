@@ -3,6 +3,13 @@ const { Status } = require("../../domain/Status/Status");
 const { Context } = require("../Context/Context");
 
 class StatusController extends Context {
+  constructor() {
+    super();
+
+    /** @type {Status[]} */
+    this.body = [new Status()];
+  }
+
   async get() {
     const status = new Status();
 
@@ -23,6 +30,16 @@ class StatusController extends Context {
     ]);
 
     this.body = [status];
+  }
+
+  async post() {
+    const statuses = this.body;
+
+    for (const status of statuses) {
+      status.mrs = Math.floor(Math.random() * 10000);
+    }
+
+    this.body = statuses;
   }
 
   /**
