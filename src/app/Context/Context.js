@@ -67,10 +67,10 @@ class Context {
       });
     });
 
-    ctx = new Context();
-    ctx.body = JSON.parse(body);
+    const responseCtx = new Context();
+    responseCtx.body = JSON.parse(body);
 
-    return ctx;
+    return responseCtx;
   }
 
   constructor() {

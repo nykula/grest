@@ -1,7 +1,17 @@
-const { Connection, ConnectionOptions, SqlParser, Statement, StatementModelUsage } = imports.gi.Gda;
+const {
+  Connection,
+  ConnectionOptions,
+  Set,
+  SqlParser,
+  Statement,
+  StatementModelUsage
+} = imports.gi.Gda;
 const GLib = imports.gi.GLib;
 const { URI } = imports.gi.Soup;
 
+/**
+ * Prepares and executes statements in a Libgda connection.
+ */
 class Db {
   /**
    * @param {string} uri
@@ -10,16 +20,17 @@ class Db {
     const { host, password, path, port, query, scheme, user } = new URI(uri);
 
     // Will mostly receive names, but let's allow absolute paths if needed.
-    const name = path.replace(/[^/]/g, "").length === 1 ? path.replace(/^\//, "") : path;
+    const name =
+      path.replace(/[^/]/g, "").length === 1 ? path.replace(/^\//, "") : path;
 
     const connection = Connection.open_from_string(
       scheme.replace("sql", "SQL"),
       `HOST=${host};PORT=${port};DB_NAME=${name};${query}`,
       `USERNAME=${user};PASSWORD=${password}`,
-      ConnectionOptions.THREAD_ISOLATED,
+      ConnectionOptions.THREAD_ISOLATED
     );
 
-    return new Db(connection)
+    return new Db(connection);
   }
 
   /**
@@ -50,27 +61,24 @@ class Db {
 
   /**
    * @param {Statement} statement
+   * @param {Set | null} parameters
    */
-  async execute(statement) {
+  async execute(statement, parameters) {
     /** @type {any} Expected type GType for Argument. */
     const colTypes = null;
 
     const id = this.connection.async_statement_execute(
       statement,
-      null,
+      parameters,
       StatementModelUsage.RANDOM_ACCESS,
       colTypes,
-      false
+      true
     );
 
-    /** @type {[any, any]} */
+    /** @type {[any, Set | null]} */
     const result = await new Promise(resolve => {
       const callback = () => {
         const _ = this.connection.async_fetch_result(id);
-
-        if (!_ || !_[0]) {
-          return;
-        }
 
         for (let i = this.callbacks.length - 1; i >= 0; i--) {
           if (this.callbacks[i] === callback) {
@@ -83,20 +91,21 @@ class Db {
       };
 
       this.callbacks.push(callback);
-    })
+    });
 
     return result;
   }
 
   /**
-   * @param {string} sql 
-   * @returns {Statement}
+   * @param {string} sql
+   * @returns {[Statement, Set]}
    */
   prepare(sql) {
     /** @type {any} */
     const statement = this.parser.parse_string(sql)[0];
+    const parameters = statement.get_parameters()[1];
 
-    return statement;
+    return [statement, parameters];
   }
 }
 

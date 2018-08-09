@@ -1,4 +1,4 @@
-const { fromGBytes } =imports.byteArray;
+const { fromGBytes } = imports.byteArray;
 const GLib = imports.gi.GLib;
 const { MemoryUse, Server } = imports.gi.Soup;
 const { Context } = require("../Context/Context");
@@ -18,7 +18,9 @@ class Route {
           /** @type {Context} */
           const ctx = new route.controller();
 
-          ctx.body = JSON.parse(String(fromGBytes(msg.request_body_data)) || "null");
+          ctx.body = JSON.parse(
+            String(fromGBytes(msg.request_body_data)) || "null"
+          );
           ctx.method = msg.method;
           ctx.path = path;
           ctx.query = /** @type {any} */ (query);
