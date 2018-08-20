@@ -80,6 +80,11 @@ class Db {
       const callback = () => {
         const _ = this.connection.async_fetch_result(id);
 
+        if (!_[0] && !_[1]) {
+          // Still processing.
+          return;
+        }
+
         for (let i = this.callbacks.length - 1; i >= 0; i--) {
           if (this.callbacks[i] === callback) {
             this.callbacks.splice(i, 1);
