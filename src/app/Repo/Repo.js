@@ -230,16 +230,19 @@ class Repo {
     const where = `where ${query.filters
       .map(
         ({ key, type, values }) =>
-          `${type[0] === "n" ? "!" : ""}(${key}${
+          `(${key}${
             {
               eq: "=",
               gte: ">=",
               in: " in",
-              lte: "<="
-            }[type.replace(/^not\./, "")]
+              lte: "<=",
+              "not.eq": "!=",
+              "not.gte": "<",
+              "not.in": " not in",
+              "not.lte": ">"
+            }[type]
           }(${values.map(toNative).join(",")}))`
       )
-      .map(x => `(${x})`)
       .join("and ")}`;
 
     return where;

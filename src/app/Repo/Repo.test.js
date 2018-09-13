@@ -184,5 +184,18 @@ class RepoExample {
       p1001 │ ???     │ 0.000000
       (5 rows)`
     );
+
+    // Kitchen sink.
+    this.t.is(
+      (await repo
+        .get()
+        .name.not.in(["flowers"])
+        .order.price.desc()
+        .limit(3)
+        .offset(1))
+        .map(x => x.id)
+        .join(","),
+      "p1,p3,p1001"
+    );
   }
 }
