@@ -1,6 +1,5 @@
 const { test } = require("gunit");
 const { Db } = require("../Db/Db");
-const { Query } = require("../Query/Query");
 const { Repo } = require("./Repo");
 
 test("connects", async t => {
@@ -78,11 +77,11 @@ class RepoExample {
    * @private
    */
   async deleteWhereTableOrFree() {
-    const repo = new Repo(this.db, Product);
+    const repo = Repo.of(this.db, Product);
 
     await Promise.all([
-      repo.delete(Query.of(Product).name.eq("table")),
-      repo.delete(Query.of(Product).price.eq(0))
+      repo.delete().name.eq("table"),
+      repo.delete().price.eq(0)
     ]);
 
     this.t.is(
@@ -100,9 +99,9 @@ class RepoExample {
    * @private
    */
   async displayProducts() {
-    const repo = new Repo(this.db, Product);
+    const repo = Repo.of(this.db, Product);
 
-    const products = await repo.get(Query.of(Product));
+    const products = await repo.get();
     const keys = Object.keys(products[0]);
 
     /** @type {any[]} */
@@ -141,7 +140,7 @@ class RepoExample {
    * @private
    */
   async insertProducts() {
-    const repo = new Repo(this.db, Product);
+    const repo = Repo.of(this.db, Product);
 
     await repo.post([
       { id: "p1", name: "chair", price: 2.0 },
@@ -170,12 +169,9 @@ class RepoExample {
    * @private
    */
   async updateWhereIdP1000() {
-    const repo = new Repo(this.db, Product);
+    const repo = Repo.of(this.db, Product);
 
-    await repo.patch(
-      { name: "flowers", price: 1.99 },
-      Query.of(Product).id.eq("p1000")
-    );
+    await repo.patch({ name: "flowers", price: 1.99 }).id.eq("p1000");
 
     this.t.is(
       await this.displayProducts(),

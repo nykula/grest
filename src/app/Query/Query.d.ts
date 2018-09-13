@@ -10,7 +10,7 @@ export class Query {
   order: { key: string, type: "asc" | "desc" }[]
 }
 
-type IQuery<T> = {
+export type IQuery<T> = {
   [P in keyof T]: T[P] extends Value ? {
     not: {
       eq(value: T[P]): IQuery<T>

@@ -7,6 +7,57 @@ class Repo {
    * @param {Db} db
    * @param {new () => any} model
    */
+  static of(db, model) {
+    return {
+      delete: () =>
+        Repo.thenify(Query.of(model), iQuery =>
+          new Repo(db, model).delete(iQuery)
+        ),
+
+      get: () =>
+        Repo.thenify(Query.of(model), iQuery =>
+          new Repo(db, model).get(iQuery)
+        ),
+
+      patch: (/** @type {any} */ diff) =>
+        Repo.thenify(Query.of(model), iQuery =>
+          new Repo(db, model).patch(diff, iQuery)
+        ),
+
+      post: (/** @type {any[]} */ entities) =>
+        new Repo(db, model).post(entities)
+    };
+  }
+
+  /**
+   * @template TResult
+   * @template TTarget
+   * @param {TTarget} target
+   * @param {(target: TTarget) => Promise<TResult>} $promise
+   */
+  static thenify(target, $promise) {
+    return Object.assign(target, {
+      then: (/** @type {(result: TResult) => any} */ callback) =>
+        new Promise(async (_, reject) => {
+          let result;
+
+          try {
+            result = await $promise(target);
+          } catch (error) {
+            reject(error);
+            return;
+          }
+
+          callback(result);
+          _();
+        })
+    });
+  }
+
+  /**
+   * @param {Db} db
+   * @param {new () => any} model
+   */
   constructor(db, model) {
     this.db = db;
     this.model = model;
