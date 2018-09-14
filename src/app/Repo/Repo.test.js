@@ -36,6 +36,10 @@ class RepoExample {
 
     this.db = db;
 
+    /** @type {any} */
+    const _ = this.db.repo(Product);
+    _.repo.maxCaches = 1;
+
     this.t = t;
   }
 
@@ -44,6 +48,7 @@ class RepoExample {
 
     await this.insertProducts();
 
+    // Tests cache.
     await this.displayProducts();
 
     await this.updateWhereIdP1000();

@@ -208,6 +208,32 @@ class Query {
 
     return this;
   }
+
+  toString() {
+    const $ = encodeURIComponent;
+
+    return this.filters
+      .map(
+        ({ key, type, values }) =>
+          `${$(key)}=${$(type)}.${
+            type === "in" || type === "not.in"
+              ? `(${values
+                  .map(x => $(String(x)))
+                  .sort()
+                  .join(",")})`
+              : $(values[0].toString())
+          }`
+      )
+      .concat(this.limit ? `limit=${$(this.limit.toString())}` : [])
+      .concat(this.offset ? `offset=${$(this.offset.toString())}` : [])
+      .concat(
+        this.order.length
+          ? `order=${this.order.map(({ key, type }) => `${$(key)}.${type}`)}`
+          : []
+      )
+      .sort()
+      .join("&");
+  }
 }
 
 exports.Query = Query;

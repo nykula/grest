@@ -7,24 +7,20 @@ class Repo {
    * @param {new () => any} model
    */
   static of(db, model) {
+    const repo = new Repo(db, model);
+
     return {
       delete: () =>
-        Repo.thenify(Query.of(model), iQuery =>
-          new Repo(db, model).delete(iQuery)
-        ),
+        Repo.thenify(Query.of(model), iQuery => repo.delete(iQuery)),
 
-      get: () =>
-        Repo.thenify(Query.of(model), iQuery =>
-          new Repo(db, model).get(iQuery)
-        ),
+      get: () => Repo.thenify(Query.of(model), iQuery => repo.get(iQuery)),
 
       patch: (/** @type {any} */ diff) =>
-        Repo.thenify(Query.of(model), iQuery =>
-          new Repo(db, model).patch(diff, iQuery)
-        ),
+        Repo.thenify(Query.of(model), iQuery => repo.patch(diff, iQuery)),
 
-      post: (/** @type {any[]} */ entities) =>
-        new Repo(db, model).post(entities)
+      post: (/** @type {any[]} */ entities) => repo.post(entities),
+
+      repo
     };
   }
 
@@ -63,6 +59,53 @@ class Repo {
 
     this.entity = new this.model();
     this.keys = Object.keys(this.entity);
+
+    this.fetchedAt = Object.create(null);
+    this.garbageFactor = 2;
+    this.maxCaches = 1e4;
+    this.results = Object.create(null);
+    const get = this.get.bind(this);
+    Object.assign(this, {
+      get: (/** @type {{ query: Query }} */ props) => {
+        const { query } = props;
+        const qStr = query.toString();
+
+        if (this.results[qStr]) {
+          return Promise.resolve(this.results[qStr]);
+        }
+
+        this.fetchedAt[qStr] = Date.now();
+        const keys = Object.keys(this.fetchedAt);
+        const undefs = keys
+          .sort(
+            (a, b) => this.fetchedAt[b].fetchedAt - this.fetchedAt[a].fetchedAt
+          )
+          .splice(this.maxCaches)
+          .map(q => (this.results[q] = undefined)).length;
+
+        if (
+          keys.length + undefs >=
+          this.maxCaches * this.garbageFactor
+        ) {
+          const fetchedAt = Object.create(null);
+          const results = Object.create(null);
+
+          for (const q of keys) {
+            const result = this.results[q];
+
+            if (result) {
+              fetchedAt[q] = this.fetchedAt[q];
+              results[q] = result;
+            }
+          }
+
+          this.fetchedAt = fetchedAt;
+          this.results = results;
+        }
+
+        return (this.results[qStr] = get(props));
+      }
+    });
   }
 
   /**
@@ -83,6 +126,16 @@ class Repo {
     );
 
     await this.db.execute(statement, inject(parameters));
+
+    this.emit("delete");
+  }
+
+  /**
+   * @param {"delete" | "patch" | "post"} _
+   */
+  emit(_) {
+    this.fetchedAt = Object.create(null);
+    this.results = Object.create(null);
   }
 
   /**
@@ -140,6 +193,8 @@ class Repo {
     `);
 
     await this.db.execute(statement, inject(parameters));
+
+    this.emit("patch");
   }
 
   /**
@@ -156,6 +211,8 @@ class Repo {
     `);
 
     await this.db.execute(statement, inject(parameters));
+
+    this.emit("post");
   }
 
   /**
