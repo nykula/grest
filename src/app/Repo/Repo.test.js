@@ -1,9 +1,8 @@
 const { test } = require("gunit");
 const { Db } = require("../Db/Db");
-const { Repo } = require("./Repo");
 
 test("connects", async t => {
-  const db = Db.connect("sqlite:repo_example_db");
+  const db = Db.connect("sqlite:example_repo");
 
   await new RepoExample(db, t).run();
 });
@@ -77,7 +76,7 @@ class RepoExample {
    * @private
    */
   async deleteWhereTableOrFree() {
-    const repo = Repo.of(this.db, Product);
+    const repo = this.db.repo(Product);
 
     await Promise.all([
       repo.delete().name.eq("table"),
@@ -99,7 +98,7 @@ class RepoExample {
    * @private
    */
   async displayProducts() {
-    const repo = Repo.of(this.db, Product);
+    const repo = this.db.repo(Product);
 
     const products = await repo.get();
     const keys = Object.keys(products[0]);
@@ -140,7 +139,7 @@ class RepoExample {
    * @private
    */
   async insertProducts() {
-    const repo = Repo.of(this.db, Product);
+    const repo = this.db.repo(Product);
 
     await repo.post([
       { id: "p1", name: "chair", price: 2.0 },
@@ -169,7 +168,7 @@ class RepoExample {
    * @private
    */
   async updateWhereIdP1000() {
-    const repo = Repo.of(this.db, Product);
+    const repo = this.db.repo(Product);
 
     await repo.patch({ name: "flowers", price: 1.99 }).id.eq("p1000");
 
@@ -184,6 +183,9 @@ class RepoExample {
       p1001 │ ???     │ 0.000000
       (5 rows)`
     );
+
+    // Reuses instance.
+    this.t.is(this.db.repo(Product), repo);
 
     // Kitchen sink.
     this.t.is(

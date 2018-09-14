@@ -21,3 +21,9 @@ export class Repo<T> {
 
   post(entities: T[]): Promise<void>;
 }
+
+interface IDb {
+  execute(stmt: any, params: any): Promise<[any, any]>,
+
+  prepare:(sql: string) => [any, any]
+}

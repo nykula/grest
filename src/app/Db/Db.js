@@ -8,6 +8,7 @@ const {
 } = imports.gi.Gda;
 const GLib = imports.gi.GLib;
 const { URI } = imports.gi.Soup;
+const { Repo } = require("../Repo/Repo");
 
 /**
  * Prepares and executes statements in a Libgda connection.
@@ -56,6 +57,14 @@ class Db {
       }
 
       return this.connection.is_opened();
+    });
+
+    /** @type {Map<new () => any, any>} */
+    this.repos = new Map();
+    const repo = this.repo.bind(this);
+    Object.assign(this, {
+      repo: (/** @type {any} */ model) =>
+        this.repos.get(model) || this.repos.set(model, repo(model)).get(model)
     });
   }
 
@@ -111,6 +120,14 @@ class Db {
     const parameters = statement.get_parameters()[1];
 
     return [statement, parameters];
+  }
+
+  /**
+   * @template T
+   * @param {new () => T} model
+   */
+  repo(model) {
+    return Repo.of(this, model);
   }
 }
 

@@ -1,10 +1,9 @@
-const { DataModel, HandlerNumerical, Set } = imports.gi.Gda;
-const { Db } = require("../Db/Db");
+const { DataModel, HandlerNumerical, Set, Statement } = imports.gi.Gda;
 const { Query } = require("../Query/Query");
 
 class Repo {
   /**
-   * @param {Db} db
+   * @param {IDb} db
    * @param {new () => any} model
    */
   static of(db, model) {
@@ -55,7 +54,7 @@ class Repo {
   }
 
   /**
-   * @param {Db} db
+   * @param {IDb} db
    * @param {new () => any} model
    */
   constructor(db, model) {
@@ -248,5 +247,11 @@ class Repo {
     return where;
   }
 }
+
+/**
+ * @typedef IDb
+ * @property {(stmt: Statement, params: Set | null) => Promise<[any, Set | null]>} execute
+ * @property {(sql: string) => [Statement, Set]} prepare
+ */
 
 exports.Repo = Repo;
