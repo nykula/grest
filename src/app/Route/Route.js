@@ -7,23 +7,23 @@ class Route {
   /**
    * @param {Route[]} routes
    */
-  static server(routes) {
+  static server(routes, services = {}) {
     const { pkg } = Route;
     const srv = new Server();
 
     for (const route of routes) {
       srv.add_handler(
         route.path,
-        async (_, msg, path, query) => {
+        async (_, msg, path) => {
           /** @type {Context} */
-          const ctx = new route.controller();
+          const ctx = new route.controller(services);
 
           ctx.body = JSON.parse(
             String(fromGBytes(msg.request_body_data)) || "null"
           );
           ctx.method = msg.method;
           ctx.path = path;
-          ctx.query = /** @type {any} */ (query);
+          ctx.query = msg.get_uri().query || "";
 
           msg.request_headers.foreach((name, value) => {
             ctx.headers[name] = value;
@@ -35,17 +35,26 @@ class Route {
           srv.pause_message(msg);
 
           try {
-            if (ctx.method !== "GET" && ctx.method !== "POST") {
-              throw new Error("MethodNotAllowed");
-            }
-
             /** @type {any} */
             const controller = ctx;
+            const method = ctx.method.toLowerCase();
 
-            await controller[ctx.method.toLowerCase()]();
+            if (
+              Object.prototype.hasOwnProperty(method) ||
+              !controller[method] ||
+              typeof controller[method] !== "function"
+            ) {
+              throw new Error("405 Method Not Allowed");
+            }
+
+            await controller[method]();
           } catch (error) {
             printerr(error);
             printerr(error.stack);
+
+            msg.set_status(
+              Number((error.message || "").replace(/^(\d+).*/, "$1")) || 500
+            );
 
             msg.set_response("text/plain", MemoryUse.COPY, error.message);
             srv.unpause_message(msg);
@@ -71,7 +80,7 @@ class Route {
         const examples = {};
 
         for (const route of routes) {
-          examples[`GET ${route.path}`] = [new route.model()];
+          examples[`GET ${route.path}`] = new route.controller(services).body;
         }
 
         msg.set_status(200);
@@ -98,9 +107,6 @@ class Route {
   constructor() {
     /** @type {any} */
     this.controller = Function;
-
-    /** @type {any} */
-    this.model = Function;
 
     this.path = "";
   }

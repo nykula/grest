@@ -85,22 +85,34 @@ class Db {
     );
 
     /** @type {[any, Set | null]} */
-    const result = await new Promise(resolve => {
-      const callback = () => {
-        const _ = this.connection.async_fetch_result(id);
-
-        if (!_[0] && !_[1]) {
-          // Still processing.
-          return;
-        }
-
+    const result = await new Promise((resolve, reject) => {
+      const unsubscribe = () => {
         for (let i = this.callbacks.length - 1; i >= 0; i--) {
           if (this.callbacks[i] === callback) {
             this.callbacks.splice(i, 1);
             break;
           }
         }
+      };
 
+      const callback = () => {
+        let _ = undefined;
+
+        try {
+          _ = this.connection.async_fetch_result(id);
+        } catch (error) {
+          unsubscribe();
+          reject(error);
+
+          return;
+        }
+
+        if (!_[0] && !_[1]) {
+          // Still processing.
+          return;
+        }
+
+        unsubscribe();
         resolve(_);
       };
 

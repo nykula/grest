@@ -20,7 +20,11 @@ class Query {
 
       offset: (/** @type {number} */ value) => ((query.offset = value), iQuery),
 
-      parse: (/** @type {string} */ $query) => query.parse($query)
+      parse: (/** @type {string} */ $query) => (query.parse($query), iQuery),
+
+      toString() {
+        return query.toString();
+      }
     };
 
     for (const key of Object.keys(example)) {

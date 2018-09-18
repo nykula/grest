@@ -6,7 +6,7 @@ const { StatusController } = require("./StatusController");
 
 test("gets", async t => {
   const App = Route.server([
-    { path: "/statuses", controller: StatusController, model: Status }
+    { path: "/statuses", controller: StatusController }
   ]);
 
   const port = 8000 + Math.floor(Math.random() * 10000);
@@ -18,7 +18,7 @@ test("gets", async t => {
 
 test("posts", async t => {
   const App = Route.server([
-    { path: "/statuses", controller: StatusController, model: Status }
+    { path: "/statuses", controller: StatusController }
   ]);
 
   const port = 8000 + Math.floor(Math.random() * 10000);
@@ -41,7 +41,7 @@ test("posts", async t => {
 
 test("documents", async t => {
   const App = Route.server([
-    { path: "/statuses", controller: StatusController, model: Status }
+    { path: "/statuses", controller: StatusController }
   ]);
 
   const port = 8000 + Math.floor(Math.random() * 10000);

@@ -32,20 +32,10 @@ class Repo {
    */
   static thenify(target, $promise) {
     return Object.assign(target, {
-      then: (/** @type {(result: TResult) => any} */ callback) =>
-        new Promise(async (_, reject) => {
-          let result;
-
-          try {
-            result = await $promise(target);
-          } catch (error) {
-            reject(error);
-            return;
-          }
-
-          callback(result);
-          _();
-        })
+      then: (/** @type {(result: TResult | Promise<any>) => any} */ callback) =>
+        $promise(target)
+          .then(callback)
+          .catch(error => callback(Promise.reject(error)))
     });
   }
 
@@ -83,10 +73,7 @@ class Repo {
           .splice(this.maxCaches)
           .map(q => (this.results[q] = undefined)).length;
 
-        if (
-          keys.length + undefs >=
-          this.maxCaches * this.garbageFactor
-        ) {
+        if (keys.length + undefs >= this.maxCaches * this.garbageFactor) {
           const fetchedAt = Object.create(null);
           const results = Object.create(null);
 
@@ -280,7 +267,7 @@ class Repo {
    */
   where(query, toNative) {
     if (!query.filters.length) {
-      return;
+      return "";
     }
 
     const where = `where ${query.filters

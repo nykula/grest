@@ -68,7 +68,14 @@ class Context {
     });
 
     const responseCtx = new Context();
-    responseCtx.body = JSON.parse(body);
+
+    try {
+      responseCtx.body = JSON.parse(body);
+    } catch (_) {
+      responseCtx.body = body;
+    }
+
+    responseCtx.status = msg.status_code;
 
     return responseCtx;
   }
@@ -79,7 +86,8 @@ class Context {
     this.headers = {};
     this.method = "";
     this.path = "";
-    this.query = {};
+    this.query = "";
+    this.status = 200;
   }
 }
 

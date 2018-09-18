@@ -45,7 +45,7 @@ test("parses", async t => {
     JSON.stringify(
       Query.of(Post).parse(
         `boardId=not.in.(anime,tech)&limit=15&modifiedAt=gte.1534639854746&modifiedAt=lte.1534726254746&offset=30&order=modifiedAt.desc&parentId=eq.`
-      )
+      ).query
     ),
     JSON.stringify({
       filters: [
