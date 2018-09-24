@@ -18,6 +18,9 @@ class Repo {
       patch: (/** @type {any} */ diff) =>
         Repo.thenify(Query.of(model), iQuery => repo.patch(diff, iQuery)),
 
+      on: (/** @type {"*"} */ _, /** @type {() => void} */ callback) =>
+        repo.callbacks.push(callback),
+
       post: (/** @type {any[]} */ entities) => repo.post(entities),
 
       repo
@@ -46,6 +49,9 @@ class Repo {
   constructor(db, model) {
     this.db = db;
     this.model = model;
+
+    /** @type {(() => void)[]} */
+    this.callbacks = [];
 
     this.entity = new this.model();
     this.keys = Object.keys(this.entity);
@@ -123,6 +129,10 @@ class Repo {
   emit(_) {
     this.fetchedAt = Object.create(null);
     this.results = Object.create(null);
+
+    for (const callback of this.callbacks) {
+      callback();
+    }
   }
 
   /**

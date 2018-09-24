@@ -80,15 +80,21 @@ class Context {
     return responseCtx;
   }
 
-  constructor() {
+  constructor(/** @type {any} */ props) {
     /** @type {any} */
     this.body = {};
     this.headers = {};
-    this.method = "";
+    this.id = "";
+    this.ip = "";
+    this.method = "GET";
     this.path = "";
     this.query = "";
+    this.props = props;
     this.status = 200;
   }
 }
+
+/** @type {(new () => any)[]} */
+Context.watch = [];
 
 exports.Context = Context;

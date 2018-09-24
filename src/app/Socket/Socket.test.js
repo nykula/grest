@@ -1,13 +1,17 @@
+const { fromGBytes } = imports.byteArray;
+const GLib = imports.gi.GLib;
+const { Message, Session, WebsocketConnection } = imports.gi.Soup;
 const { test } = require("gunit");
 const { Product } = require("../../domain/Product/Product");
 const { Context } = require("../Context/Context");
 const { Db } = require("../Db/Db");
 const { ProductController } = require("../Product/ProductController");
 const { Query } = require("../Query/Query");
-const { Route } = require("./Route");
+const { Route } = require("../Route/Route");
+const { Socket } = require("./Socket");
 
 test("connects", async t => {
-  const db = Db.connect("sqlite:example_route");
+  const db = Db.connect("sqlite:example_socket");
 
   await new RepoExample(db, t).run();
 });
@@ -30,33 +34,100 @@ class RepoExample {
    */
   constructor(db, t) {
     this.db = db;
+    this.firstSubscriptionId = "";
+    /** @type {{ [id: string]: Context }} */
+    this.notifications = Object.create(null);
     this.port = 8000 + Math.floor(Math.random() * 10000);
+    this.socket = new WebsocketConnection();
     this.t = t;
 
     /** @type {typeof Context.fetch} */
     this.fetch = (path, init) =>
-      Context.fetch(`http://localhost:${this.port}${path}`, init);
+      new Promise(resolve => {
+        const [pathname, query] = path.split("?");
+        init = init || new Context();
+        const { method } = init;
+
+        const id = init.id || Math.random().toString();
+
+        this.socket.connect(
+          "message",
+          (_, __, gBytes) => {
+            const response = JSON.parse(String(fromGBytes(gBytes)));
+
+            if (response.id === id && response.method === method) {
+              resolve(response);
+            } else if (response.id === id) {
+              this.notifications[id] = response;
+            }
+          }
+        );
+
+        this.socket.send_text(
+          JSON.stringify({
+            body: init.body,
+            id,
+            method,
+            path: pathname,
+            query: query || ""
+          })
+        );
+      });
   }
 
   async run() {
-    // Literals are okay. Constructor works too.
-    const productRoute = new Route();
-    productRoute.controller = ProductController;
-    productRoute.path = "/products";
+    const routes = [
+      { controller: ProductController, path: "/products" },
+      { controller: ProductController, path: "/different-route" },
+      { controller: ProductController, path: "/yet-another-route" }
+    ];
 
     const services = { db: this.db };
-    Route.server([productRoute], services).listen_all(this.port, 0);
+
+    const App = Route.server(routes, services);
+    Socket.watch(App, routes, services);
+
+    App.listen_all(this.port, 0);
+
+    const session = new Session();
+    await new Promise(resolve =>
+      session.websocket_connect_async(
+        /** @type {any} */ (Message.new("GET", `ws://localhost:${this.port}/`)),
+        null,
+        null,
+        null,
+        (_, asyncResult) => {
+          this.socket = session.websocket_connect_finish(asyncResult);
+          resolve();
+        }
+      )
+    );
 
     await this.createTable();
 
+    const { id } = await this.fetch("/products", { method: "SUBSCRIBE" });
+    this.firstSubscriptionId = id;
+
+    // Still okay, does nothing.
+    await this.fetch("/nonexistent-route", { method: "SUBSCRIBE" });
+
     await this.insertProducts();
 
-    // Tests cache.
-    await this.displayProducts();
+    // Not earlier, to verify that one works as well as many.
+    const altId = (await this.fetch("/different-route", {
+      method: "SUBSCRIBE"
+    })).id;
+
+    await this.fetch("/yet-another-route", { method: "SUBSCRIBE" });
 
     await this.updateWhereIdP1000();
-
     await this.deleteWhereTableOrFree();
+
+    await this.fetch("/products", { id, method: "UNSUBSCRIBE" });
+    await this.fetch("/products", { id: altId, method: "UNSUBSCRIBE" });
+
+    // /yet-another-route unsubscribes itself.
+    this.socket.close(0, null);
 
     this.db.connection.close();
   }
@@ -133,7 +204,14 @@ class RepoExample {
    * @private
    */
   async displayProducts() {
-    return JSON.stringify((await this.fetch("/products")).body);
+    const products = JSON.stringify((await this.fetch("/products")).body);
+
+    this.t.is(
+      JSON.stringify(this.notifications[this.firstSubscriptionId].body),
+      products
+    );
+
+    return products;
   }
 
   /**
@@ -170,6 +248,16 @@ class RepoExample {
    * @private
    */
   async updateWhereIdP1000() {
+    // Kitchen sink.
+    const { id } = await this.fetch(
+      `/products?${Query.of(Product)
+        .name.not.in(["flowers"])
+        .order.price.desc()
+        .limit(3)
+        .offset(1)}`,
+      { method: "SUBSCRIBE" }
+    );
+
     await this.fetch("/products?id=eq.p1000", {
       body: [{ name: "flowers", price: 1.99 }],
       method: "PATCH"
@@ -186,18 +274,18 @@ class RepoExample {
       ])
     );
 
-    // Kitchen sink.
+    await new Promise(resolve =>
+      GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => !!resolve())
+    );
+
+    // Kitchen sink continues.
     this.t.is(
-      (await this.fetch(
-        `/products?${Query.of(Product)
-          .name.not.in(["flowers"])
-          .order.price.desc()
-          .limit(3)
-          .offset(1)}`
-      )).body
+      this.notifications[id].body
         .map((/** @type {Product} */ x) => x.id)
         .join(","),
       "p1,p3,p1001"
     );
+
+    await this.fetch("/products", { id, method: "UNSUBSCRIBE" });
   }
 }

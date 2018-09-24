@@ -6,6 +6,8 @@ export class Repo<T> {
 
     get(): IQuery<T, Promise<T[]>>;
 
+    on(_: "*", callback: () => void): void;
+
     patch(diff: Partial<T>): IQuery<T, Promise<void>>;
 
     post(entities: T[]): Promise<void>;
@@ -25,5 +27,5 @@ export class Repo<T> {
 interface IDb {
   execute(stmt: any, params: any): Promise<[any, any]>,
 
-  prepare:(sql: string) => [any, any]
+  prepare: (sql: string) => [any, any]
 }

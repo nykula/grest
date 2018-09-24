@@ -5,6 +5,45 @@ const { Context } = require("../Context/Context");
 
 class Route {
   /**
+   * @param {{ message?: string }} error
+   */
+  static error(error) {
+    const message = error.message || "";
+    const statusStr = message.replace(/^(\d+).*/, "$1");
+    const status = Number(statusStr) || 500;
+
+    return {
+      message: statusStr ? message : `${status} ${message}`,
+      status
+    };
+  }
+
+  /**
+   * @param {Context} request
+   * @param {Context} ctx
+   */
+  static async handleRequest(request, ctx) {
+    const response = new Context();
+    ctx.ip = request.ip;
+    response.method = ctx.method;
+
+    response.id = ctx.id = request.id;
+    response.path = ctx.path = request.path;
+    response.query = ctx.query = request.query;
+
+    try {
+      await Route.exec(ctx);
+      response.body = ctx.body;
+    } catch (error) {
+      const { message, status } = Route.error(error);
+      response.body = /** @type {any} */ (message);
+      response.status = status;
+    }
+
+    return response;
+  }
+
+  /**
    * @param {Route[]} routes
    */
   static server(routes, services = {}) {
@@ -14,13 +53,14 @@ class Route {
     for (const route of routes) {
       srv.add_handler(
         route.path,
-        async (_, msg, path) => {
+        async (_, msg, path, __, client) => {
           /** @type {Context} */
           const ctx = new route.controller(services);
 
           ctx.body = JSON.parse(
             String(fromGBytes(msg.request_body_data)) || "null"
           );
+          ctx.ip = client.get_host() || "";
           ctx.method = msg.method;
           ctx.path = path;
           ctx.query = msg.get_uri().query || "";
@@ -35,28 +75,15 @@ class Route {
           srv.pause_message(msg);
 
           try {
-            /** @type {any} */
-            const controller = ctx;
-            const method = ctx.method.toLowerCase();
-
-            if (
-              Object.prototype.hasOwnProperty(method) ||
-              !controller[method] ||
-              typeof controller[method] !== "function"
-            ) {
-              throw new Error("405 Method Not Allowed");
-            }
-
-            await controller[method]();
+            await this.exec(ctx);
           } catch (error) {
-            printerr(error);
-            printerr(error.stack);
-
-            msg.set_status(
-              Number((error.message || "").replace(/^(\d+).*/, "$1")) || 500
+            const { message, status } = Route.error(error);
+            msg.set_status(status);
+            msg.set_response(
+              "text/plain",
+              MemoryUse.COPY,
+              /** @type {any} */ (message)
             );
-
-            msg.set_response("text/plain", MemoryUse.COPY, error.message);
             srv.unpause_message(msg);
 
             return;
@@ -77,6 +104,10 @@ class Route {
     srv.add_handler(
       null,
       async (_, msg) => {
+        if (msg.request_headers.get_one("Upgrade") === "websocket") {
+          return;
+        }
+
         const examples = {};
 
         for (const route of routes) {
@@ -104,9 +135,28 @@ class Route {
     return srv;
   }
 
-  constructor() {
+  /**
+   * @private
+   * @param {Context} ctx
+   */
+  static async exec(ctx) {
     /** @type {any} */
-    this.controller = Function;
+    const controller = ctx;
+    const method = ctx.method.toLowerCase();
+
+    if (
+      Object.prototype.hasOwnProperty(method) ||
+      !controller[method] ||
+      typeof controller[method] !== "function"
+    ) {
+      throw new Error("405 Method Not Allowed");
+    }
+
+    await controller[method]();
+  }
+
+  constructor() {
+    this.controller = Context;
 
     this.path = "";
   }
