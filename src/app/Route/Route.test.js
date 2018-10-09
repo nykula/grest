@@ -45,7 +45,8 @@ class RepoExample {
     productRoute.path = "/products";
 
     const services = { db: this.db };
-    Route.server([productRoute], services).listen_all(this.port, 0);
+    const App = Route.server([productRoute], services);
+    App.listen_all(this.port, 0);
 
     await this.createTable();
 

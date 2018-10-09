@@ -34,7 +34,7 @@ class Query {
         desc: () => (query.order.push({ key, type: "desc" }), iQuery)
       };
 
-      iQuery[key] = {
+      /** @type {any} */ (iQuery)[key] = {
         eq: (/** @type {Value} */ value) => (
           query.filters.push({
             key,

@@ -20,8 +20,9 @@ class Context {
     });
 
     for (const name of Object.keys(headers)) {
-      if (headers[name]) {
-        msg.request_headers.append(name, headers[name]);
+      const header = headers[name];
+      if (header) {
+        msg.request_headers.append(name, header);
       }
     }
 
@@ -83,6 +84,7 @@ class Context {
   constructor(/** @type {any} */ props) {
     /** @type {any} */
     this.body = {};
+    /** @type {{ [key: string]: string | undefined }} */
     this.headers = {};
     this.id = "";
     this.ip = "";

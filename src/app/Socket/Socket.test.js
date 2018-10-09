@@ -275,7 +275,7 @@ class RepoExample {
     );
 
     await new Promise(resolve =>
-      GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => !!resolve())
+      GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => (resolve(), false))
     );
 
     // Kitchen sink continues.

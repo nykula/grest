@@ -108,6 +108,7 @@ class Route {
           return;
         }
 
+        /** @type {any} */
         const examples = {};
 
         for (const route of routes) {
