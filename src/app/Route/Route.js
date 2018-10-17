@@ -1,4 +1,4 @@
-const { fromGBytes } = imports.byteArray;
+const { fromGBytes, toString } = imports.byteArray;
 const GLib = imports.gi.GLib;
 const { MemoryUse, Server } = imports.gi.Soup;
 const { Context } = require("../Context/Context");
@@ -51,87 +51,77 @@ class Route {
     const srv = new Server();
 
     for (const route of routes) {
-      srv.add_handler(
-        route.path,
-        async (_, msg, path, __, client) => {
-          /** @type {Context} */
-          const ctx = new route.controller(services);
+      srv.add_handler(route.path, async (_, msg, path, __, client) => {
+        /** @type {Context} */
+        const ctx = new route.controller(services);
+        const bytes = fromGBytes(msg.request_body_data);
+        ctx.body = JSON.parse(bytes.length ? toString(bytes) : "null");
+        ctx.ip = client.get_host() || "";
+        ctx.method = msg.method;
+        ctx.path = path;
+        ctx.query = msg.get_uri().query || "";
 
-          ctx.body = JSON.parse(
-            String(fromGBytes(msg.request_body_data)) || "null"
-          );
-          ctx.ip = client.get_host() || "";
-          ctx.method = msg.method;
-          ctx.path = path;
-          ctx.query = msg.get_uri().query || "";
+        msg.request_headers.foreach((name, value) => {
+          ctx.headers[name] = value;
+        });
 
-          msg.request_headers.foreach((name, value) => {
-            ctx.headers[name] = value;
-          });
+        msg.response_headers.append("Access-Control-Allow-Origin", "*");
+        msg.response_headers.append("Vary", "Origin");
 
-          msg.response_headers.append("Access-Control-Allow-Origin", "*");
-          msg.response_headers.append("Vary", "Origin");
+        srv.pause_message(msg);
 
-          srv.pause_message(msg);
-
-          try {
-            await this.exec(ctx);
-          } catch (error) {
-            const { message, status } = Route.error(error);
-            msg.set_status(status);
-            msg.set_response(
-              "text/plain",
-              MemoryUse.COPY,
-              /** @type {any} */ (message)
-            );
-            srv.unpause_message(msg);
-
-            return;
-          }
-
-          msg.set_status(200);
+        try {
+          await this.exec(ctx);
+        } catch (error) {
+          const { message, status } = Route.error(error);
+          msg.set_status(status);
           msg.set_response(
-            "application/json",
+            "text/plain",
             MemoryUse.COPY,
-            /** @type {any} */ (JSON.stringify(ctx.body))
+            /** @type {any} */ (message)
           );
           srv.unpause_message(msg);
-        },
-        /** @type {any} */ (undefined) // Typings issue, ignore warning.
-      );
-    }
 
-    srv.add_handler(
-      null,
-      async (_, msg) => {
-        if (msg.request_headers.get_one("Upgrade") === "websocket") {
           return;
-        }
-
-        /** @type {any} */
-        const examples = {};
-
-        for (const route of routes) {
-          examples[`GET ${route.path}`] = new route.controller(services).body;
         }
 
         msg.set_status(200);
         msg.set_response(
           "application/json",
           MemoryUse.COPY,
-          /** @type {any} */ (JSON.stringify({
-            app: {
-              description: pkg.description,
-              name: pkg.name,
-              repository: pkg.private ? "." : pkg.repository,
-              version: pkg.version
-            },
-            examples
-          }))
+          /** @type {any} */ (JSON.stringify(ctx.body))
         );
-      },
-      /** @type {any} */ (undefined) // Typings issue, ignore warning.
-    );
+        srv.unpause_message(msg);
+      });
+    }
+
+    srv.add_handler(null, async (_, msg) => {
+      if (msg.request_headers.get_one("Upgrade") === "websocket") {
+        return;
+      }
+
+      /** @type {any} */
+      const examples = {};
+
+      for (const route of routes) {
+        examples[`GET ${route.path}`] = new route.controller(services).body;
+      }
+
+      msg.set_status(200);
+      msg.set_response(
+        "application/json",
+        MemoryUse.COPY,
+        /** @type {any} */ (JSON.stringify({
+          app: {
+            description: pkg.description,
+            name: pkg.name,
+            repository: pkg.private ? "." : pkg.repository,
+            version: pkg.version
+          },
+          examples
+        }))
+      );
+    });
 
     return srv;
   }

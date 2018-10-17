@@ -1,4 +1,4 @@
-const { fromGBytes } = imports.byteArray;
+const { fromGBytes, toString } = imports.byteArray;
 const GLib = imports.gi.GLib;
 const { Message, Session, WebsocketConnection } = imports.gi.Soup;
 const { test } = require("gunit");
@@ -53,7 +53,7 @@ class RepoExample {
         this.socket.connect(
           "message",
           (_, __, gBytes) => {
-            const response = JSON.parse(String(fromGBytes(gBytes)));
+            const response = JSON.parse(toString(fromGBytes(gBytes)));
 
             if (response.id === id && response.method === method) {
               resolve(response);
@@ -173,7 +173,7 @@ class RepoExample {
       const { body, status } = await this.fetch("/products?id=p3", {
         method: "DELETE"
       });
-      this.t.is(body.toString(), "403 Forbidden Delete Not By Name Or Price");
+      this.t.is(String(body), "403 Forbidden Delete Not By Name Or Price");
       this.t.is(status, 403);
     }
 
@@ -181,7 +181,7 @@ class RepoExample {
       const { body, status } = await this.fetch("/products?name=eq.table", {
         method: "toString"
       });
-      this.t.is(body.toString(), "405 Method Not Allowed");
+      this.t.is(String(body), "405 Method Not Allowed");
       this.t.is(status, 405);
     }
 

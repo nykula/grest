@@ -1,4 +1,4 @@
-const { fromGBytes } = imports.byteArray;
+const { fromGBytes, toString } = imports.byteArray;
 const { Server, WebsocketConnection } = imports.gi.Soup;
 const { Db } = require("../Db/Db");
 const { Context } = require("../Context/Context");
@@ -14,64 +14,58 @@ class Socket {
     /** @type {{ connection: WebsocketConnection, request: Context, route: Route }[]} */
     const subscriptions = [];
 
-    App.add_websocket_handler(
-      null,
-      null,
-      null,
-      (_, connection, __, client) => {
-        const ip = client.get_host();
+    App.add_websocket_handler(null, null, null, (_, connection, __, client) => {
+      const ip = client.get_host();
 
-        connection.connect(
-          "closed",
-          () => {
+      connection.connect(
+        "closed",
+        () => {
+          for (let i = subscriptions.length - 1; i >= 0; i--) {
+            if (subscriptions[i].connection === connection) {
+              subscriptions.splice(i, 1);
+            }
+          }
+        }
+      );
+
+      connection.connect(
+        "message",
+        async (___, ____, gBytes) => {
+          /** @type {Context} */
+          const request = JSON.parse(toString(fromGBytes(gBytes)));
+          const route = routes.find(x => x.path === request.path);
+
+          if (!route) {
+            connection.send_text(JSON.stringify(Socket.ok(request)));
+            return;
+          }
+
+          request.ip = ip || "::1";
+          const method = request.method.toLowerCase();
+
+          if (method === "subscribe") {
+            subscriptions.push({ connection, request, route });
+
+            connection.send_text(JSON.stringify(Socket.ok(request)));
+          } else if (method === "unsubscribe") {
             for (let i = subscriptions.length - 1; i >= 0; i--) {
-              if (subscriptions[i].connection === connection) {
+              if (subscriptions[i].request.id === request.id) {
                 subscriptions.splice(i, 1);
               }
             }
+
+            connection.send_text(JSON.stringify(Socket.ok(request)));
+          } else {
+            const ctx = new route.controller(services);
+            ctx.body = request.body;
+            ctx.method = request.method;
+
+            const response = await Route.handleRequest(request, ctx);
+            connection.send_text(JSON.stringify(response));
           }
-        );
-
-        connection.connect(
-          "message",
-          async (___, ____, gBytes) => {
-            /** @type {Context} */
-            const request = JSON.parse(String(fromGBytes(gBytes)));
-            const route = routes.find(x => x.path === request.path);
-
-            if (!route) {
-              connection.send_text(JSON.stringify(Socket.ok(request)));
-              return;
-            }
-
-            request.ip = ip || "::1";
-            const method = request.method.toLowerCase();
-
-            if (method === "subscribe") {
-              subscriptions.push({ connection, request, route });
-
-              connection.send_text(JSON.stringify(Socket.ok(request)));
-            } else if (method === "unsubscribe") {
-              for (let i = subscriptions.length - 1; i >= 0; i--) {
-                if (subscriptions[i].request.id === request.id) {
-                  subscriptions.splice(i, 1);
-                }
-              }
-
-              connection.send_text(JSON.stringify(Socket.ok(request)));
-            } else {
-              const ctx = new route.controller(services);
-              ctx.body = request.body;
-              ctx.method = request.method;
-
-              const response = await Route.handleRequest(request, ctx);
-              connection.send_text(JSON.stringify(response));
-            }
-          }
-        );
-      },
-      /** @type {any} */ (undefined) // Typings issue, ignore warning.
-    );
+        }
+      );
+    });
 
     routes.map(route =>
       route.controller.watch.map(model =>

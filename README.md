@@ -4,10 +4,10 @@ REST API microframework for GNOME JavaScript. Talks JSON. Wraps [libsoup](https:
 
 ## Install
 
-Grest is known to work on Gjs 1.52 with [CommonJS runtime](https://github.com/cgjs/cgjs).
+Grest is known to work on Gjs 1.55 with [CommonJS runtime](https://github.com/cgjs/cgjs).
 
 ```bash
-yarn add grest
+npm i -S grest
 ```
 
 ## Usage

@@ -47,7 +47,8 @@ class StatusController extends Context {
    * @param {string} path
    */
   async count(path) {
-    const base = "https://gitlab.gnome.org/api/v4/projects/GNOME%2Fgjs";
+    // How to enable SSL in JHBuild test env?
+    const base = "http://gitlab.gnome.org/api/v4/projects/GNOME%2Fgjs";
 
     const { body } = await Context.fetch(`${base}${path}`, {
       headers: {

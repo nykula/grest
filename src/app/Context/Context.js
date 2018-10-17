@@ -1,4 +1,4 @@
-const { fromString } = imports.byteArray;
+const { fromString, toString } = imports.byteArray;
 const { DataInputStream } = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const { Message, Session, URI } = imports.gi.Soup;
@@ -64,7 +64,7 @@ class Context {
           return;
         }
 
-        resolve(maybeBody.toString());
+        resolve(maybeBody.length ? toString(maybeBody) : undefined);
       });
     });
 
