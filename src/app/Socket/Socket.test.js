@@ -7,6 +7,7 @@ const { Context } = require("../Context/Context");
 const { Db } = require("../Db/Db");
 const { ProductController } = require("../Product/ProductController");
 const { Query } = require("../Query/Query");
+const { Patch } = require("../Patch/Patch");
 const { Route } = require("../Route/Route");
 const { Socket } = require("./Socket");
 
@@ -35,8 +36,8 @@ class RepoExample {
   constructor(db, t) {
     this.db = db;
     this.firstSubscriptionId = "";
-    /** @type {{ [id: string]: Context }} */
-    this.notifications = Object.create(null);
+    /** @type {{ [id: string]: string }} */
+    this.evs = Object.create(null);
     this.port = 8000 + Math.floor(Math.random() * 10000);
     this.socket = new WebsocketConnection();
     this.t = t;
@@ -57,8 +58,8 @@ class RepoExample {
 
             if (response.id === id && response.method === method) {
               resolve(response);
-            } else if (response.id === id) {
-              this.notifications[id] = response;
+            } else if (response[0] === id) {
+              this.evs[id] = Patch.apply(this.evs[id] || "", response.slice(1));
             }
           }
         );
@@ -207,7 +208,8 @@ class RepoExample {
     const products = JSON.stringify((await this.fetch("/products")).body);
 
     this.t.is(
-      JSON.stringify(this.notifications[this.firstSubscriptionId].body),
+      // tslint:disable-next-line:no-eval
+      JSON.stringify(eval(`(${this.evs[this.firstSubscriptionId]})`).body),
       products
     );
 
@@ -280,8 +282,9 @@ class RepoExample {
 
     // Kitchen sink continues.
     this.t.is(
-      this.notifications[id].body
-        .map((/** @type {Product} */ x) => x.id)
+      // tslint:disable-next-line:no-eval
+      eval(`(${this.evs[id]})`)
+        .body.map((/** @type {Product} */ x) => x.id)
         .join(","),
       "p1,p3,p1001"
     );

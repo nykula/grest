@@ -9,7 +9,7 @@ const routes = [
   { controller: StatusController, path: "/statuses" }
 ];
 
-const services = { db: Db.connect("sqlite:example_db") };
+const services = { db: Db.connect("sqlite:example_route") };
 
 const App = Route.server(routes, services);
 Socket.watch(App, routes, services);

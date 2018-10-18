@@ -85,6 +85,11 @@ class Route {
           return;
         }
 
+        const allow = ctx.headers.Allow;
+        if (allow) {
+          msg.response_headers.append("Access-Control-Allow-Methods", allow);
+          msg.response_headers.append("Allow", allow);
+        }
         msg.set_status(200);
         msg.set_response(
           "application/json",
@@ -128,22 +133,33 @@ class Route {
 
   /**
    * @private
-   * @param {Context} ctx
+   * @param {Context} controller
    */
-  static async exec(ctx) {
+  static async exec(controller) {
     /** @type {any} */
-    const controller = ctx;
-    const method = ctx.method.toLowerCase();
+    const ctx = controller;
+    const method = controller.method.toLowerCase();
+    const O = Object;
 
     if (
-      Object.prototype.hasOwnProperty(method) ||
-      !controller[method] ||
-      typeof controller[method] !== "function"
+      O.prototype.hasOwnProperty(method) ||
+      !ctx[method] ||
+      typeof ctx[method] !== "function"
     ) {
+      if (method === "options") {
+        controller.headers.Allow = O.getOwnPropertyNames(O.getPrototypeOf(ctx))
+          .filter(
+            x => typeof ctx[x] === "function" && !O.prototype.hasOwnProperty(x)
+          )
+          .map(x => x.toUpperCase())
+          .concat("OPTIONS")
+          .join(",");
+        return;
+      }
       throw new Error("405 Method Not Allowed");
     }
 
-    await controller[method]();
+    await ctx[method]();
   }
 
   constructor() {
