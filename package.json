@@ -1,8 +1,9 @@
 {
   "name": "grest",
-  "description": "Gjs REST API microframework, talks JSON, wraps libsoup",
+  "description": "Gjs REST API framework, talks JSON, wraps libsoup and libgda",
   "version": "1.1.0",
-  "main": "src/index.js",
+  "main": "src",
+  "types": "src",
   "scripts": {
     "format": "tsc && tslint -p . --fix && gunit",
     "start": "cgjs bin/start.js",

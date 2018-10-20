@@ -8,6 +8,8 @@
   "jsRules": {
     "prettier": true
   },
-  "rules": {},
+  "rules": {
+    "prettier": true
+  },
   "rulesDirectory": []
 }

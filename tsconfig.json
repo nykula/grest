@@ -13,7 +13,8 @@
     "esModuleInterop": true
   },
   "include": [
-    "node_modules/ts-for-gjs/out/*.d.ts",
+    "node_modules/ts-for-gjs/out/index.d.ts",
+    "bin",
     "src"
   ]
 }

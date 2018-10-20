@@ -1,6 +1,6 @@
 # grest.js
 
-REST API microframework for GNOME JavaScript. Talks JSON. Wraps [libsoup](https://wiki.gnome.org/Projects/libsoup), a native HTTP client/server library, with Promise-based plumbing.
+REST API framework for GNOME JavaScript. Talks JSON. Wraps [libsoup](https://wiki.gnome.org/Projects/libsoup), a native HTTP client/server library, and [libgda](https://developer.gnome.org/libgda/), a data abstraction layer, with Promise-based plumbing.
 
 ## Install
 
@@ -27,17 +27,15 @@ class Greeting {
 class GreetingController extends Context {
   async get() {
     await Promise.resolve();
-
     this.body = [new Greeting()];
   }
 }
 
 const App = Route.server([
-  { path: "/greetings", controller: GreetingController, model: Greeting }
+  { path: "/greetings", controller: GreetingController }
 ]);
 
 App.listen_all(3000, ServerListenOptions.IPV6_ONLY);
-
 App.run();
 ```
 
@@ -141,7 +139,7 @@ const { GreetingController } = require("./GreetingController");
 
 test("gets", async t => {
   const App = Route.server([
-    { path: "/greetings", controller: GreetingController, model: Greeting }
+    { path: "/greetings", controller: GreetingController }
   ]);
 
   const port = 8000 + Math.floor(Math.random() * 10000);
@@ -151,6 +149,182 @@ test("gets", async t => {
   t.is(body[0].hello, "world");
 });
 ```
+
+## Database
+
+Assume you have a `Product` table with the following schema:
+
+```sql
+create table Product (
+  id varchar(64) not null primary key,
+  name varchar(64) not null,
+  price real
+)
+```
+
+Define an entity class to match your table:
+
+```js
+class Product {
+  constructor() {
+    this.id = "";
+    this.name = "";
+    this.price = 0;
+  }
+}
+```
+
+Tell Grest where your db is, and give `Route.server` an extra parameter:
+
+```js
+const { Db, Route } = require("grest");
+const db = Db.connect("sqlite:example"); // example.db in project root
+const services = { db };
+const routes = [{ path: "/products", controller: ProductController }];
+const App = Route.server(routes, services);
+App.listen_all(3000, 0);
+App.run();
+```
+
+In-memory SQLite and other backends supported by Libgda can work too:
+
+```js
+Db.connect("sqlite::memory:");
+
+// Grest parses database config from URL.
+Db.connect("mysql://user:pass@host:post/db");
+
+// When deploying, read your database config from an environment variable.
+Db.connect(imports.gi.GLib.getenv("DB"));
+```
+
+For every request, Grest constructs your controller with your services as props:
+
+```js
+class ProductController extends Context {
+  /** @param {{ db: Db }} props */
+  constructor(props) {
+    super(props);
+    /** @type {Product[]} */
+    this.body = [new Product()];
+    this.repo = props.db.repo(Product);
+  }
+
+  // ...
+}
+```
+
+Based on your entity class fields, Grest builds SQL from common queries, executing when you call `await`:
+
+```js
+/**
+ * @example GET /products?name=not.in.(chair,table)
+ * @example GET /products?limit=2&order=price.desc&price=gte.1
+ */
+async get() {
+  this.body = await this.repo.get().parse(this.query);
+
+  // Or build your SELECT query programmatically, with a fluent chain:
+  this.body = await this.repo
+    .get()
+    .name.not.in(["flowers"])
+    .order.price.desc()
+    .limit(3)
+    .offset(1);
+}
+```
+
+Whitelist or otherwise limit what a user can do:
+
+```js
+/** @example DELETE /products?name=eq.chair */
+async delete() {
+  if (!/^(name|price)=eq\.[a-z0-9-]+$/.test(this.query)) {
+    // Beginning digits, if any, define the HTTP response code.
+    throw new Error("403 Forbidden Delete Not By Name Or Price");
+  }
+  await this.repo.delete().parse(this.query);
+}
+```
+
+Pass a JSON array as body when POSTing:
+
+```js
+/** @example POST /products */
+async post() {
+  await this.repo.post(this.body);
+
+  // Or CREATE manually:
+  await this.repo.post([
+    { id: "p1", name: "chair", price: 2.0 },
+    { id: "p2", name: "table", price: 5 },
+    { id: "p3", name: "glass", price: 1.1 },
+  ]);
+
+  // Won't do nulls, GDA_TYPE_NULL isn't usable through introspection.
+}
+```
+
+Wrap your PATCH body in an array as well, to reuse `this.body` type:
+
+```js
+/** @example PATCH [{ name: "armchair" }] /products?name=eq.chair */
+async patch() {
+  await this.repo.patch(this.body[0]).parse(this.query);
+
+  // Doing an UPDATE manually:
+  await this.repo
+    .patch({ name: "armchair" }) // New values.
+    // WHERE conditions:
+    .name.eq("chair")
+    .price.lte(3);
+}
+```
+
+[Db test](src/app/Db/Db.test.js) shows how to make lower level SQL queries.
+
+## WebSocket
+
+Grest optionally exposes your API through WebSocket, and lets users subscribe to receive a patch whenever you update the Product repo:
+
+```js
+class ProductController extends Context {
+  // ...
+}
+
+// Whitelist entities that trigger a route refresh.
+ProductController.watch = [Product];
+
+exports.ProductController = ProductController;
+```
+
+Give `Socket.watch` your routes and services in your entry point:
+
+```js
+const services = { db }; // Required.
+const App = Route.server(routes, services);
+Socket.watch(App, routes, services);
+```
+
+Routes exposed to WebSocket can be same as HTTP, or a different set:
+
+```js
+const App = Route.server(
+  [
+    { path: "/greetings", controller: GreetingController },
+    { path: "/products", controller: ProductController }
+  ],
+  services
+);
+
+Socket.watch(
+  App,
+  [{ path: "/products", controller: ProductController }],
+  services
+);
+```
+
+[Socket test](src/app/Socket/Socket.test.js) shows how to set up the client side, and [Patch test](src/app/Patch/Patch.test.js) shows what subscribers recieve.
 
 ## License
 
