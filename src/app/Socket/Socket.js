@@ -1,3 +1,4 @@
+require("../Byte/ByteString").require();
 const { fromGBytes, toString } = imports.byteArray;
 const { Server, WebsocketConnection } = imports.gi.Soup;
 const { Db } = require("../Db/Db");

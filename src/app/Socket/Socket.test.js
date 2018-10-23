@@ -1,3 +1,4 @@
+require("../Byte/ByteString").require();
 const { fromGBytes, toString } = imports.byteArray;
 const GLib = imports.gi.GLib;
 const { Message, Session, WebsocketConnection } = imports.gi.Soup;

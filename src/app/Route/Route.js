@@ -1,3 +1,4 @@
+require("../Byte/ByteString").require();
 const { fromGBytes, toString } = imports.byteArray;
 const GLib = imports.gi.GLib;
 const { MemoryUse, Server } = imports.gi.Soup;
@@ -55,7 +56,7 @@ class Route {
         /** @type {Context} */
         const ctx = new route.controller(services);
         const bytes = fromGBytes(msg.request_body_data);
-        ctx.body = JSON.parse(bytes.length ? toString(bytes) : "null");
+        ctx.body = JSON.parse(bytes && bytes.length ? toString(bytes) : "null");
         ctx.ip = client.get_host() || "";
         ctx.method = msg.method;
         ctx.path = path;

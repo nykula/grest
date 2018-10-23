@@ -1,3 +1,4 @@
+require("../Byte/ByteString").require();
 const { fromString, toString } = imports.byteArray;
 const { DataInputStream } = imports.gi.Gio;
 const GLib = imports.gi.GLib;
@@ -54,17 +55,17 @@ class Context {
 
       stream.read_line_async(GLib.PRIORITY_DEFAULT, null, (_, asyncResult) => {
         /** @type {any} */
-        let maybeBody;
+        let maybe;
 
         try {
-          [maybeBody] = stream.read_line_finish(asyncResult);
+          [maybe] = stream.read_line_finish(asyncResult);
         } catch (error) {
           reject(error);
 
           return;
         }
 
-        resolve(maybeBody.length ? toString(maybeBody) : undefined);
+        resolve(maybe && maybe.length ? toString(maybe) : "null");
       });
     });
 
