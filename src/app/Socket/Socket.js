@@ -13,7 +13,7 @@ class Socket {
    * @param {{ db: Db }} services
    */
   static watch(App, routes, services) {
-    /** @type {{ connection: WebsocketConnection, last: string, request: Context, route: Route }[]} */
+    /** @type {{ connection: WebsocketConnection, last: string, q: (() => Promise)[], request: Context, route: Route }[]} */
     const subscriptions = [];
 
     App.add_websocket_handler(null, null, null, (_, connection, __, client) => {
@@ -46,7 +46,7 @@ class Socket {
           const method = request.method.toLowerCase();
 
           if (method === "subscribe") {
-            subscriptions.push({ connection, last: "", request, route });
+            subscriptions.push({ connection, last: "", q: [], request, route });
 
             connection.send_text(JSON.stringify(Socket.ok(request)));
           } else if (method === "unsubscribe") {
@@ -73,26 +73,35 @@ class Socket {
     routes.map(route =>
       route.controller.watch.map(model =>
         services.db.repo(model).on("*", () =>
-          subscriptions.forEach(async sub => {
+          subscriptions.forEach(sub => {
             if (sub.route !== route) {
               return;
             }
-
-            const { connection, last, request } = sub;
-            const ctx = new route.controller(services);
-            const resp = await Route.handleRequest(request, ctx);
-            sub.last = $(resp).replace(/([[,{])"(.*?[^\\])":/g, "$1$2:");
-            connection.send_text($([resp.id, ...Patch.diff(last, sub.last)]));
+            this.push(sub.q, async () => {
+              const { connection, last, request } = sub;
+              const ctx = new route.controller(services);
+              const resp = await Route.handleRequest(request, ctx);
+              sub.last = $(resp).replace(/([[,{])"(.*?[^\\])":/g, "$1$2:");
+              connection.send_text($([resp.id, ...Patch.diff(last, sub.last)]));
+            });
           })
         )
       )
     );
   }
 
-  /**
-   * @private
-   * @param {Context} request
-   */
+  /** @private @param {(() => Promise)[]} q @param {() => Promise} x */
+  static async push(q, x) {
+    if (q.push(x) === 1) {
+      while (q.length) {
+        const _ = q[0];
+        await _();
+        q.shift();
+      }
+    }
+  }
+
+  /** @private @param {Context} request */
   static ok(request) {
     const response = new Context();
     response.id = request.id;

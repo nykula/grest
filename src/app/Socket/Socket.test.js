@@ -24,6 +24,119 @@ test("connects memory", async t => {
   await new RepoExample(db, t).run();
 });
 
+test("watches, queueing publications", async t => {
+  class Post {
+    constructor() {
+      this.xs = "";
+    }
+  }
+  const db = Db.connect("sqlite::memory:");
+  await db.execute(db.prepare("create table Post (xs text)")[0], null);
+
+  class PostController extends Context {
+    constructor() {
+      super();
+      this.body = [new Post()];
+    }
+    async get() {
+      this.body = await db.repo(Post).get();
+    }
+    async patch() {
+      await db.repo(Post).patch(this.body[0]);
+    }
+    async post() {
+      await db.repo(Post).post(this.body);
+    }
+  }
+  PostController.watch = [Post];
+  const routes = [{ controller: PostController, path: "/posts" }];
+  const services = { db };
+  const App = Route.server(routes, services);
+  Socket.watch(App, routes, services);
+  const port = 8000 + Math.floor(Math.random() * 10000);
+  App.listen_all(port, 0);
+  await new Promise(resolve =>
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, () => (resolve(), false))
+  );
+
+  let socket = new WebsocketConnection();
+  const s = new Session();
+  /** @type {any} */ const msg = Message.new("GET", `ws://localhost:${port}/`);
+  await new Promise(resolve =>
+    s.websocket_connect_async(msg, null, null, null, (_, asyncResult) =>
+      resolve((socket = s.websocket_connect_finish(asyncResult)))
+    )
+  );
+  let last = "";
+  await new Promise($ => {
+    socket.connect(
+      "message",
+      (_, __, gBytes) => {
+        const response = JSON.parse(toString(fromGBytes(gBytes)));
+        if (response.method === "SUBSCRIBE") {
+          $();
+        } else if (0 in response) {
+          last = Patch.apply(last, response.slice(1));
+        }
+      }
+    );
+    socket.send_text(
+      JSON.stringify({
+        id: "0",
+        method: "SUBSCRIBE",
+        path: "/posts",
+        query: ""
+      })
+    );
+  });
+
+  socket.send_text(
+    JSON.stringify({
+      body: [{ xs: "" }],
+      id: Math.random().toString(),
+      method: "POST",
+      path: "/posts",
+      query: ""
+    })
+  );
+  await new Promise(resolve =>
+    GLib.timeout_add(
+      GLib.PRIORITY_DEFAULT,
+      Math.floor(Math.random() * 200),
+      () => (resolve(), false)
+    )
+  );
+
+  const xs = "foobar bazqux fghi lorem ipsum dolor sit amet";
+  for (let i = 0; i < xs.length; i++) {
+    socket.send_text(
+      JSON.stringify({
+        body: [{ xs: xs.slice(0, i + 1) }],
+        id: Math.random().toString(),
+        method: "PATCH",
+        path: "/posts",
+        query: ""
+      })
+    );
+    await new Promise(resolve =>
+      GLib.timeout_add(
+        GLib.PRIORITY_DEFAULT,
+        Math.floor(Math.random() * 200),
+        () => (resolve(), false)
+      )
+    );
+  }
+
+  await new Promise(resolve =>
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => (resolve(), false))
+  );
+  t.is(
+    // tslint:disable-next-line:no-eval
+    JSON.stringify(eval(`(${last})`).body),
+    JSON.stringify([{ xs: "foobar bazqux fghi lorem ipsum dolor sit amet" }])
+  );
+});
+
 /**
  * Creates a "products" table with a few rows.
  *
