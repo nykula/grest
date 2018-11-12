@@ -92,7 +92,7 @@ test("watches, queueing publications", async t => {
 
   socket.send_text(
     JSON.stringify({
-      body: [{ xs: "" }],
+      body: [new Post()],
       id: Math.random().toString(),
       method: "POST",
       path: "/posts",
@@ -135,6 +135,107 @@ test("watches, queueing publications", async t => {
     JSON.stringify(eval(`(${last})`).body),
     JSON.stringify([{ xs: "foobar bazqux fghi lorem ipsum dolor sit amet" }])
   );
+});
+
+test("watches, reusing headers and hiding private properties", async t => {
+  class Post {
+    constructor() {
+      this.xs = "";
+    }
+  }
+  const db = Db.connect("sqlite::memory:");
+  await db.execute(db.prepare("create table Post (xs text)")[0], null);
+
+  class PostController extends Context {
+    constructor() {
+      super();
+      this.body = [new Post()];
+      this._ = {
+        loggedIn: () => {
+          if (this.headers.Authorization !== "Bearer foobar") {
+            throw new Error("403 Forbidden");
+          }
+        }
+      };
+    }
+    async get() {
+      this._.loggedIn();
+      this.body = await db.repo(Post).get();
+    }
+    async post() {
+      await db.repo(Post).post(this.body);
+    }
+  }
+  PostController.watch = [Post];
+  const routes = [{ controller: PostController, path: "/posts" }];
+  const services = { db };
+  const App = Route.server(routes, services);
+  Socket.watch(App, routes, services);
+  const port = 8000 + Math.floor(Math.random() * 10000);
+  App.listen_all(port, 0);
+  await new Promise(resolve =>
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, () => (resolve(), false))
+  );
+
+  let socket = new WebsocketConnection();
+  const s = new Session();
+  /** @type {any} */ const msg = Message.new("GET", `ws://localhost:${port}/`);
+  await new Promise(resolve =>
+    s.websocket_connect_async(msg, null, null, null, (_, asyncResult) =>
+      resolve((socket = s.websocket_connect_finish(asyncResult)))
+    )
+  );
+  let i = 0;
+  /** @type {{ [id: string]: string }} */ const last = { 0: "", 1: "" };
+  await new Promise($ => {
+    socket.connect(
+      "message",
+      (_, __, gBytes) => {
+        const response = JSON.parse(toString(fromGBytes(gBytes)));
+        if (response.method === "SUBSCRIBE" && i++ === 1) {
+          $();
+        } else if (0 in response) {
+          last[response[0]] = Patch.apply(last[response[0]], response.slice(1));
+        }
+      }
+    );
+    socket.send_text(
+      JSON.stringify({
+        headers: {},
+        id: "0",
+        method: "SUBSCRIBE",
+        path: "/posts",
+        query: ""
+      })
+    );
+    socket.send_text(
+      JSON.stringify({
+        headers: { Authorization: "Bearer foobar" },
+        id: "1",
+        method: "SUBSCRIBE",
+        path: "/posts",
+        query: ""
+      })
+    );
+  });
+
+  socket.send_text(
+    JSON.stringify({
+      body: [new Post()],
+      id: Math.random().toString(),
+      method: "POST",
+      path: "/posts",
+      query: ""
+    })
+  );
+  await new Promise(_ => GLib.timeout_add(0, 1000, () => (_(), false)));
+
+  // tslint:disable:no-eval
+  t.is(JSON.stringify(eval(`(${last[0]})`).status), JSON.stringify(403));
+  t.is(JSON.stringify(eval(`(${last[1]})`).body), JSON.stringify([{ xs: "" }]));
+  t.is(eval(`(${last[0]})`)._, undefined);
+  t.is(eval(`(${last[1]})`)._, undefined);
+  // tslint:enable:no-eval
 });
 
 /**

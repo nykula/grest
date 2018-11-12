@@ -5,9 +5,7 @@ const { MemoryUse, Server } = imports.gi.Soup;
 const { Context } = require("../Context/Context");
 
 class Route {
-  /**
-   * @param {{ message?: string }} error
-   */
+  /** @param {{ message?: string }} error */
   static error(error) {
     const message = error.message || "";
     const statusStr = message.replace(/^(\d+).*/, "$1");
@@ -19,42 +17,41 @@ class Route {
     };
   }
 
-  /**
-   * @param {Context} request
-   * @param {Context} ctx
-   */
-  static async handleRequest(request, ctx) {
-    const response = new Context();
-    ctx.ip = request.ip;
-    response.method = ctx.method;
+  /** @param {Context} controller */
+  static async runIfAllows(controller) {
+    /** @type {any} */ const ctx = controller;
+    const method = controller.method.toLowerCase();
+    const O = Object;
 
-    response.id = ctx.id = request.id;
-    response.path = ctx.path = request.path;
-    response.query = ctx.query = request.query;
-
-    try {
-      await Route.exec(ctx);
-      response.body = ctx.body;
-    } catch (error) {
-      const { message, status } = Route.error(error);
-      response.body = /** @type {any} */ (message);
-      response.status = status;
+    if (
+      O.prototype.hasOwnProperty(method) ||
+      !ctx[method] ||
+      typeof ctx[method] !== "function"
+    ) {
+      if (method === "options") {
+        controller.headers.Allow = O.getOwnPropertyNames(O.getPrototypeOf(ctx))
+          .filter(
+            x => typeof ctx[x] === "function" && !O.prototype.hasOwnProperty(x)
+          )
+          .map(x => x.toUpperCase())
+          .concat("OPTIONS")
+          .join(",");
+        return;
+      }
+      throw new Error("405 Method Not Allowed");
     }
 
-    return response;
+    await ctx[method]();
   }
 
-  /**
-   * @param {Route[]} routes
-   */
+  /** @param {Route[]} routes */
   static server(routes, services = {}) {
     const { pkg } = Route;
     const srv = new Server();
 
     for (const route of routes) {
       srv.add_handler(route.path, async (_, msg, path, __, client) => {
-        /** @type {Context} */
-        const ctx = new route.controller(services);
+        /** @type {Context} */ const ctx = new route.controller(services);
         const bytes = fromGBytes(msg.request_body_data);
         ctx.body = JSON.parse(bytes && bytes.length ? toString(bytes) : "null");
         ctx.ip = client.get_host() || "";
@@ -72,7 +69,7 @@ class Route {
         srv.pause_message(msg);
 
         try {
-          await this.exec(ctx);
+          await this.runIfAllows(ctx);
         } catch (error) {
           const { message, status } = Route.error(error);
           msg.set_status(status);
@@ -106,9 +103,7 @@ class Route {
         return;
       }
 
-      /** @type {any} */
-      const examples = {};
-
+      /** @type {any} */ const examples = {};
       for (const route of routes) {
         examples[`GET ${route.path}`] = new route.controller(services).body;
       }
@@ -132,44 +127,10 @@ class Route {
     return srv;
   }
 
-  /**
-   * @private
-   * @param {Context} controller
-   */
-  static async exec(controller) {
-    /** @type {any} */
-    const ctx = controller;
-    const method = controller.method.toLowerCase();
-    const O = Object;
-
-    if (
-      O.prototype.hasOwnProperty(method) ||
-      !ctx[method] ||
-      typeof ctx[method] !== "function"
-    ) {
-      if (method === "options") {
-        controller.headers.Allow = O.getOwnPropertyNames(O.getPrototypeOf(ctx))
-          .filter(
-            x => typeof ctx[x] === "function" && !O.prototype.hasOwnProperty(x)
-          )
-          .map(x => x.toUpperCase())
-          .concat("OPTIONS")
-          .join(",");
-        return;
-      }
-      throw new Error("405 Method Not Allowed");
-    }
-
-    await ctx[method]();
-  }
-
   constructor() {
     this.controller = Context;
-
     this.path = "";
   }
 }
-
 Route.pkg = require(GLib.get_current_dir() + "/package.json");
-
 exports.Route = Route;

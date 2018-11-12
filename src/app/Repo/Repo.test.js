@@ -127,11 +127,10 @@ class RepoExample {
       .concat(
         xs.map(product =>
           keys
-            .map(
-              (key, i) =>
-                i === keys.length - 1
-                  ? product[key].toFixed(6)
-                  : product[key].padEnd(length[i], " ")
+            .map((key, i) =>
+              i === keys.length - 1
+                ? product[key].toFixed(6)
+                : product[key].padEnd(length[i], " ")
             )
             .join(" │ ")
         )
