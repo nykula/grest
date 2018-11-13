@@ -1,7 +1,7 @@
 require("../Byte/ByteString").require();
 const { fromGBytes, toString } = imports.byteArray;
 const GLib = imports.gi.GLib;
-const { MemoryUse, Server } = imports.gi.Soup;
+const { MemoryUse, Message, Server } = imports.gi.Soup;
 const { Context } = require("../Context/Context");
 
 class Route {
@@ -44,10 +44,16 @@ class Route {
     await ctx[method]();
   }
 
-  /** @param {Route[]} routes */
+  /** @param {Route[]} routes @param {any} services */
   static server(routes, services = {}) {
     const { pkg } = Route;
     const srv = new Server();
+
+    /** @type {(error?: Error, ctx?: Context) => void} */
+    const log =
+      services.log ||
+      ((x, y) =>
+        (!y || y.method !== "OPTIONS") && x ? printerr(x, x.stack) : print(y));
 
     for (const route of routes) {
       srv.add_handler(route.path, async (_, msg, path, __, client) => {
@@ -59,10 +65,9 @@ class Route {
         ctx.path = path;
         ctx.query = msg.get_uri().query || "";
 
-        msg.request_headers.foreach((name, value) => {
-          ctx.headers[name] = value;
-        });
-
+        msg.request_headers.foreach(
+          (name, value) => (ctx.headers[name] = value)
+        );
         msg.response_headers.append("Access-Control-Allow-Origin", "*");
         msg.response_headers.append("Vary", "Origin");
 
@@ -71,6 +76,7 @@ class Route {
         try {
           await this.runIfAllows(ctx);
         } catch (error) {
+          log(error);
           const { message, status } = Route.error(error);
           msg.set_status(status);
           msg.set_response(
@@ -79,6 +85,9 @@ class Route {
             /** @type {any} */ (message)
           );
           srv.unpause_message(msg);
+          ctx.status = status;
+          this.meta(msg, ctx);
+          log(undefined, ctx);
 
           return;
         }
@@ -95,11 +104,18 @@ class Route {
           /** @type {any} */ (JSON.stringify(ctx.body))
         );
         srv.unpause_message(msg);
+        this.meta(msg, ctx);
+        log(undefined, ctx);
       });
     }
 
-    srv.add_handler(null, async (_, msg) => {
+    srv.add_handler(null, async (_, msg, __, ___, client) => {
+      const ctx = new Context();
+      ctx.ip = client.get_host() || "";
+      msg.request_headers.foreach((name, value) => (ctx.headers[name] = value));
       if (msg.request_headers.get_one("Upgrade") === "websocket") {
+        this.meta(msg, ctx);
+        log(undefined, ctx);
         return;
       }
 
@@ -122,9 +138,25 @@ class Route {
           examples
         }))
       );
+      this.meta(msg, ctx);
+      log(undefined, ctx);
     });
 
     return srv;
+  }
+
+  /** @private @param {Message} msg @param {Context} ctx */
+  static meta(msg, ctx) {
+    ctx.length =
+      msg.request_headers.get_content_length() +
+      msg.request_body.length +
+      msg.response_headers.get_content_length() +
+      msg.response_body.length;
+    ctx.method = msg.method;
+    const uri = msg.get_uri();
+    ctx.path = uri.path;
+    ctx.query = uri.query || "";
+    ctx.protocol = `HTTP/${msg.get_http_version().toFixed(1)}`;
   }
 
   constructor() {

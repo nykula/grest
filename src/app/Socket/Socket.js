@@ -7,8 +7,11 @@ const { Patch } = require("../Patch/Patch");
 const { Route } = require("../Route/Route");
 
 class Socket {
-  /** @param {Server} App @param {Route[]} routes @param {{ db: Db }} services */
+  /** @param {Server} App @param {Route[]} routes @param {{ db: Db, log: (error?: Error, ctx?: Context) => void }} services */
   static watch(App, routes, services) {
+    const log =
+      services.log || ((x, y) => (x ? printerr(x, x.stack) : print(y)));
+
     /** @type {{ connection: WebsocketConnection, last: string, q: (() => Promise)[], request: Context, route: Route }[]} */
     const subscriptions = [];
 
@@ -29,34 +32,54 @@ class Socket {
       connection.connect(
         "message",
         async (___, ____, gBytes) => {
-          /** @type {Context} */
-          const request = JSON.parse(toString(fromGBytes(gBytes)));
-          const route = routes.find(x => x.path === request.path);
-
+          const $$request = toString(fromGBytes(gBytes));
+          /** @type {Partial<Context>} */
+          const $request = JSON.parse($$request);
+          const route = routes.find(x => x.path === $request.path);
+          const request = route
+            ? new route.controller(services)
+            : new Context();
+          request.body = $request.body;
+          request.headers = $request.headers || {};
+          request.id = String($request.id);
+          request.ip = ip || "::";
+          request.method = String($request.method);
+          request.path = String($request.path);
+          request.protocol = "websocket";
+          request.query = String($request.query);
           if (!route) {
-            connection.send_text(JSON.stringify(Socket.ok(request)));
+            const $response = JSON.stringify(Socket.ok(request));
+            connection.send_text($response);
+            request.length = $$request.length + $response.length;
+            log(undefined, request);
             return;
           }
 
-          request.ip = ip || "::1";
           const method = request.method.toLowerCase();
-
           if (method === "subscribe") {
             subscriptions.push({ connection, last: "", q: [], request, route });
-            connection.send_text(JSON.stringify(Socket.ok(request)));
+            const $response = JSON.stringify(Socket.ok(request));
+            connection.send_text($response);
+            request.length = $$request.length + $response.length;
+            log(undefined, request);
           } else if (method === "unsubscribe") {
             for (let i = subscriptions.length - 1; i >= 0; i--) {
               if (subscriptions[i].request.id === request.id) {
                 subscriptions.splice(i, 1);
               }
             }
-            connection.send_text(JSON.stringify(Socket.ok(request)));
+            const $response = JSON.stringify(Socket.ok(request));
+            connection.send_text($response);
+            request.length = $$request.length + $response.length;
+            log(undefined, request);
           } else {
             const ctx = new route.controller(services);
             ctx.method = request.method;
-
-            const response = await Socket.exec(request, ctx);
-            connection.send_text(JSON.stringify(response));
+            const response = await Socket.exec(request, ctx, log);
+            const $response = JSON.stringify(response);
+            connection.send_text($response);
+            request.length = $$request.length + $response.length;
+            log(undefined, request);
           }
         }
       );
@@ -73,9 +96,13 @@ class Socket {
             this.push(sub.q, async () => {
               const { connection, last, request } = sub;
               const ctx = new route.controller(services);
-              const resp = await Socket.exec(request, ctx);
+              const resp = await Socket.exec(request, ctx, log);
               sub.last = $(resp).replace(/([[,{])"(.*?[^\\])":/g, "$1$2:");
-              connection.send_text($([resp.id, ...Patch.diff(last, sub.last)]));
+              const $response = $([resp.id, ...Patch.diff(last, sub.last)]);
+              connection.send_text($response);
+              ctx.length = $response.length;
+              ctx.status = resp.status;
+              log(undefined, ctx);
             });
           })
         )
@@ -83,8 +110,8 @@ class Socket {
     );
   }
 
-  /** @private @param {Context} request @param {Context} ctx */
-  static async exec(request, ctx) {
+  /** @private @param {Context} request @param {Context} ctx @param {(error?: Error) => void} log */
+  static async exec(request, ctx, log) {
     // Create from scratch, you can have private props in controller.
     const response = new Context();
 
@@ -102,6 +129,7 @@ class Socket {
       await Route.runIfAllows(ctx);
       response.body = ctx.body;
     } catch (error) {
+      log(error);
       const { message, status } = Route.error(error);
       response.body = /** @type {any} */ (message);
       response.status = status;

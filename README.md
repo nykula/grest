@@ -326,6 +326,64 @@ Socket.watch(
 
 [Socket test](src/app/Socket/Socket.test.js) shows how to set up the client side, and [Patch test](src/app/Patch/Patch.test.js) shows what subscribers recieve.
 
+## Logging
+
+Goes to stdout and stderr by default. You can provide a custom logger instead:
+
+```js
+const { Context, Db, Route } = require("grest");
+const db = Db.connect("sqlite:example");
+const services = { db, log }; // Pass your logger as a service.
+const routes = [{ path: "/products", controller: ProductController }];
+const App = Route.server(routes, services);
+Socket.watch(App, routes, services);
+App.listen_all(3000, 0);
+App.run();
+
+/** @param {Error?} error @param {Context?} context */
+function log(error, context) {
+  if (error) {
+    printerr(error, error.stack);
+  } else {
+    // ...
+  }
+}
+```
+
+For example, if you have a `Log` entity and want to save the IP address:
+
+```js
+const { ip, path, protocol } = context;
+if (path !== "/logs" || protocol !== "websocket") { // Avoid loop if watching.
+  db.repo(Log).post([{ createdAt: date.now(), ip }]);
+}
+```
+
+[Same fields](src/app/Context/Context.d.ts) are available as in controller:
+
+```js
+class Context {
+  // ...
+  headers: { [key: string]: string; }
+  id: string
+  ip: string
+  method: string
+  path: string
+  protocol: string
+  query: string
+  status: number
+  userId: string // Unused internally. You can set in controller.
+  // ...
+}
+```
+    
+Context `toString()` returns Combined Log Format.
+
+```js
+print(context);
+// -> ::1 - - [12/Nov/2018:12:34:56 +0000] "GET /products?limit=3&name=not.in.(flowers)&offset=1&order=price.desc HTTP/1.1" 200 276 "-" "DuckDuckBot/1.0; (+http://duckduckgo.com/duckduckbot.html)"
+```
+
 ## License
 
 MIT
